@@ -1,0 +1,174 @@
+[
+  {
+    "title": "Resting",
+    "runtime_slot": "idle",
+    "row": 0,
+    "frames": 6,
+    "durations_ms": [
+      280,
+      110,
+      110,
+      140,
+      140,
+      320
+    ],
+    "gif": "idle.gif",
+    "contact_sheet": "idle-frames.png"
+  },
+  {
+    "title": "Moving right",
+    "runtime_slot": "running-right",
+    "row": 1,
+    "frames": 8,
+    "durations_ms": [
+      120,
+      120,
+      120,
+      120,
+      120,
+      120,
+      120,
+      220
+    ],
+    "gif": "running-right.gif",
+    "contact_sheet": "running-right-frames.png"
+  },
+  {
+    "title": "Moving left",
+    "runtime_slot": "running-left",
+    "row": 2,
+    "frames": 8,
+    "durations_ms": [
+      120,
+      120,
+      120,
+      120,
+      120,
+      120,
+      120,
+      220
+    ],
+    "gif": "running-left.gif",
+    "contact_sheet": "running-left-frames.png"
+  },
+  {
+    "title": "Attention wave",
+    "runtime_slot": "waving",
+    "row": 3,
+    "frames": 4,
+    "durations_ms": [
+      140,
+      140,
+      140,
+      280
+    ],
+    "gif": "waving.gif",
+    "contact_sheet": "waving-frames.png"
+  },
+  {
+    "title": "Jumping",
+    "runtime_slot": "jumping",
+    "row": 4,
+    "frames": 5,
+    "durations_ms": [
+      140,
+      140,
+      140,
+      140,
+      280
+    ],
+    "gif": "jumping.gif",
+    "contact_sheet": "jumping-frames.png"
+  },
+  {
+    "title": "Disappointed",
+    "runtime_slot": "failed",
+    "row": 5,
+    "frames": 8,
+    "durations_ms": [
+      140,
+      140,
+      140,
+      140,
+      140,
+      140,
+      140,
+      240
+    ],
+    "gif": "failed.gif",
+    "contact_sheet": "failed-frames.png"
+  },
+  {
+    "title": "Waiting for you",
+    "runtime_slot": "waiting",
+    "row": 6,
+    "frames": 6,
+    "durations_ms": [
+      150,
+      150,
+      150,
+      150,
+      150,
+      260
+    ],
+    "gif": "waiting.gif",
+    "contact_sheet": "waiting-frames.png"
+  },
+  {
+    "title": "Thinking",
+    "runtime_slot": "running",
+    "row": 7,
+    "frames": 6,
+    "durations_ms": [
+      120,
+      120,
+      120,
+      120,
+      120,
+      220
+    ],
+    "gif": "running.gif",
+    "contact_sheet": "running-frames.png"
+  },
+  {
+    "title": "Reviewing",
+    "runtime_slot": "review",
+    "row": 8,
+    "frames": 6,
+    "durations_ms": [
+      150,
+      150,
+      150,
+      150,
+      150,
+      280
+    ],
+    "gif": "review.gif",
+    "contact_sheet": "review-frames.png"
+  },
+  {
+    "title": "Look around",
+    "frames": 16,
+    "preview_duration_ms": 180,
+    "timing_note": "Illustrative sweep; the app selects a direction from the pointer position.",
+    "labels": [
+      "Up",
+      "Up-right · 22.5°",
+      "Up-right · 45°",
+      "Up-right · 67.5°",
+      "Right",
+      "Down-right · 112.5°",
+      "Down-right · 135°",
+      "Down-right · 157.5°",
+      "Down",
+      "Down-left · 202.5°",
+      "Down-left · 225°",
+      "Down-left · 247.5°",
+      "Left",
+      "Up-left · 292.5°",
+      "Up-left · 315°",
+      "Up-left · 337.5°"
+    ],
+    "gif": "look-around.gif"
+  }
+]
