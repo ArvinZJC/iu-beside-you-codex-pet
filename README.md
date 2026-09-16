@@ -1,6 +1,6 @@
 # IU Beside You
 
-An unofficial, fan-made Codex pet inspired by IU. Wearing a cream jumper and a lavender skirt, IU Beside You keeps you company with gentle waves, playful jumps, expressive reactions and sixteen look directions.
+An unofficial, fan-made Codex pet inspired by IU, pairing a realistic face with a chibi body. Wearing a cream jumper and a lavender skirt, IU Beside You keeps you company with gentle waves, playful jumps, expressive reactions and sixteen look directions.
 
 ## Get the pet
 
