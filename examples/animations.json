@@ -5,15 +5,16 @@
     "row": 0,
     "frames": 6,
     "durations_ms": [
-      280,
-      110,
-      110,
-      140,
-      140,
-      320
+      1680,
+      660,
+      660,
+      840,
+      840,
+      1920
     ],
     "gif": "idle.gif",
-    "contact_sheet": "idle-frames.png"
+    "contact_sheet": "idle-frames.png",
+    "timing_note": "Idle uses the app’s six-times-slower resting cadence."
   },
   {
     "title": "Moving right",
