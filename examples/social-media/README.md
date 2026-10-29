@@ -27,7 +27,7 @@ Options:
 
 ## Recordings
 
-The [edited screen recording](screen-recording-edited.mp4) was captured with CleanShot on 29 October 2026. It has already been trimmed and framed for this video, so you do not need the original recording to rebuild the demo.
+The [edited screen recording](screen-recording-edited.mp4) was captured with CleanShot on 30 October 2026. It has already been trimmed and framed for this video, so you do not need the original recording to rebuild the demo.
 
 The [piano recording](gymnopedie-no-1.mp3) is Kevin MacLeod’s recording of Erik Satie’s “Gymnopedie No. 1”, downloaded from the [official source](https://incompetech.com/music/royalty-free/mp3-royaltyfree/Gymnopedie%20No%201.mp3). It is available under the [CC BY 4.0 licence](https://creativecommons.org/licenses/by/4.0/). The demo uses the passage from 00:08 to 00:53, with the volume lowered and a fade at each end.
 
