@@ -22,7 +22,7 @@ Find IU Beside You on either pet-sharing site:
        └── spritesheet.webp
    ```
 
-4. Open **Settings → Pets**, click the refresh/reload button, then select **IU Beside You**.
+4. Open **Settings → Mini & Pets**, click the refresh/reload button, then select **IU Beside You**.
 
 Only these two files are needed for installation. To update an existing installation, replace both files and refresh the pet picker again. See the [official pet guide](https://learn.chatgpt.com/docs/pets#create-a-custom-pet) for more about selecting custom pets.
 
@@ -38,4 +38,10 @@ To view it offline, clone this repository and open [`examples/index.html`](examp
 - **Playback controls:** pause and play, with reduced-motion preferences respected.
 - **Automatic light and dark themes:** follows your system preference. Animation previews retain their original light backgrounds.
 
-Standard animation previews use Codex’s frame timings. The look-around preview is an illustrative sweep; in Codex, gaze follows the pointer. No audio or external resources are required.
+Standard animation previews use Codex’s frame timings. The look-around preview is an illustrative sweep; in Codex, gaze follows the pointer. The gallery plays without audio and requires no external resources.
+
+## Social media examples
+
+Watch the [demonstration video](examples/social-media/demo.mp4) or download the [cover image](examples/social-media/cover.png). The 59.4-second portrait video includes all nine animations, sixteen look directions and a trigger guide, with Chinese captions and an original instrumental soundtrack.
+
+See [social media examples](examples/social-media/README.md) for video details and generation instructions.
