@@ -170,18 +170,18 @@ class Scrapbook:
                 self.text(im, (110, y), trigger, 32, MUTED, "lm")
                 self.text(im, (950, y), reaction, 36, INK, "rm")
                 d.line((110, y + 48, 950, y + 48), fill="#e6ddd1", width=2)
-            self.text(im, (110, 1460), "视线：快捷聊天输入光标，或", 30, anchor="lm")
+            self.text(im, (110, 1460), "视线跟随快捷聊天的输入光标，或", 30, anchor="lm")
             self.text(
                 im,
                 (110, 1510),
-                "Computer Use 操作光标；不是普通鼠标。",
+                "Computer Use 的操作光标，不跟随普通鼠标。",
                 30,
                 anchor="lm",
             )
             self.text(im, (540, 1690), "实际表现以你安装的应用版本为准", 28, MUTED)
         else:
             im = self.base(
-                "留一页 / 给你", "愿忙碌，也有温柔相伴", "IU Beside You · 知恩相伴"
+                "留一页 / 给你", "愿你忙碌时，也有温柔相伴", "IU Beside You · 知恩相伴"
             )
             self.text(im, (540, 1190), "九种动画 · 十六个视线方向", 36)
             self.text(im, (540, 1280), "把陪伴，留在每一个平凡日子里。", 28, PURPLE)
