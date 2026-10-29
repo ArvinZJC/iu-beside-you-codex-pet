@@ -1,46 +1,38 @@
 # Social media examples
 
-- [Demonstration video](demo.mp4): 1080 × 1920, 30 fps, 59.4 seconds, with Chinese captions and an original instrumental soundtrack. It includes all nine animations, sixteen look directions and a seven-second trigger guide that viewers can pause to read.
-- [Cover image](cover.png): artwork for sharing the pet on social media.
+- [Demonstration video](demo.mp4): a 45-second video showing the pet in use on the desktop, all nine animations and sixteen look directions, with Chinese captions and piano music.
+- [Edited screen recording](screen-recording-edited.mp4): the 6.4-second opening clip, trimmed and framed in portrait format, without music.
+- [Cover image](cover.png): artwork for sharing the pet.
 
-The video uses H.264 video and stereo AAC audio in an MP4 container. Its trigger guide reflects the September 2026 app behaviour; controls may differ in later versions.
+Both videos use H.264 at 1080 × 1920 and 30 fps. The demo also includes stereo AAC audio and a guide to triggering the animations, which you can pause to read. The guide reflects how the app behaved in September 2026; controls may differ in later versions.
 
 ## Generate the video
 
-You will need Python 3 with `Pillow` and `numpy`, FFmpeg with the `libx264` and `aac` encoders on your `PATH`, and a Chinese font. The default is PingFang SC, collection face 3, on macOS.
+You will need Python 3 with `Pillow` and `numpy`, FFmpeg with the `libx264` and `aac` encoders on your `PATH`, and a Chinese font. On macOS, the renderer looks for PingFang SC in the system font collection (face index 3).
 
-From the repository root, run:
+Run this command from the repository root:
 
 ```sh
 python3 examples/social-media/scripts/render_demo.py
 ```
 
-This replaces `demo.mp4` in this directory. The renderer builds the scenes from the repository’s animation assets, then synthesises and adds the soundtrack. The cover image is maintained separately.
+This rebuilds and replaces `demo.mp4` using the repository’s pet sprites and the two recordings in this directory. It leaves the opening clip and cover unchanged and needs no network connection.
 
-To save another copy:
+Options:
 
-```sh
-python3 examples/social-media/scripts/render_demo.py --output /tmp/demo.mp4
-```
+- `--output /tmp/demo.mp4`: save the video elsewhere.
+- `--preview`: save a `.jpg` contact sheet instead of the full video. Requires FFmpeg.
+- `--work-dir /tmp/iu-demo-build`: keep intermediate files, the contact sheet and chapter metadata. These are deleted after rendering unless you specify a work directory.
+- `--font /path/to/font.ttf --font-index 0`: choose a font and face index for the generated scenes. This does not change the text in the opening clip. You can also set the font path with `DEMO_FONT`.
 
-Both rendering and preview generation support these options:
+## Recordings
 
-- `--preview`: write a contact sheet with a `.jpg` extension instead of rendering a video.
-- `--work-dir /tmp/demo-build`: retain intermediate files in the chosen directory.
-- `--font /path/to/font.ttf --font-index 0`: use another font and face index. You can also set the font path with `DEMO_FONT`.
+The [edited screen recording](screen-recording-edited.mp4) was captured with CleanShot on 29 October 2026. It has already been trimmed and framed for this video, so you do not need the original recording to rebuild the demo.
 
-By default, intermediate frames, audio and metadata are created in a temporary directory and removed when the renderer exits. Retained builds include `review.jpg` and `manifest.json`; full video builds also include the generated audio and music provenance. No metadata sidecar is written beside the final video.
+The [piano recording](gymnopedie-no-1.mp3) is Kevin MacLeod’s recording of Erik Satie’s “Gymnopedie No. 1”, downloaded from the [official source](https://incompetech.com/music/royalty-free/mp3-royaltyfree/Gymnopedie%20No%201.mp3). It is available under the [CC BY 4.0 licence](https://creativecommons.org/licenses/by/4.0/). The demo uses the passage from 00:08 to 00:53, with the volume lowered and a fade at each end.
 
-## Soundtrack
+## Music credit
 
-The renderer runs [`scripts/compose_demo_music.py`](scripts/compose_demo_music.py) to generate a stereo WAV, encodes it as AAC and includes it in the finished MP4. No separate audio file is needed in the repository.
+When sharing the video, include this attribution in the post caption or accompanying credits:
 
-The score uses synthesised sounds, with no artist recordings or external samples.
-
-To generate the soundtrack separately:
-
-```sh
-python3 examples/social-media/scripts/compose_demo_music.py /tmp/demo-score
-```
-
-This writes a WAV file and music provenance information to the chosen directory. Full video builds also include that provenance in their temporary chapter manifest.
+> Music: “Gymnopedie No. 1” by Kevin MacLeod (incompetech.com), composed by Erik Satie. Licensed under CC BY 4.0: https://creativecommons.org/licenses/by/4.0/. Excerpt 00:08–00:53; level adjusted and fades added. Source: https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100787

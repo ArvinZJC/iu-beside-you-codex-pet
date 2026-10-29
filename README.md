@@ -42,6 +42,6 @@ Standard animation previews use Codex’s frame timings. The look-around preview
 
 ## Social media examples
 
-Watch the [demonstration video](examples/social-media/demo.mp4) or download the [cover image](examples/social-media/cover.png). The 59.4-second portrait video includes all nine animations, sixteen look directions and a trigger guide, with Chinese captions and an original instrumental soundtrack.
+Watch the [demonstration video](examples/social-media/demo.mp4) or download the [cover image](examples/social-media/cover.png). The 45-second video shows the pet in use on the desktop, followed by its animations in a scrapbook layout, with Chinese captions and a licensed piano soundtrack.
 
-See [social media examples](examples/social-media/README.md) for video details and generation instructions.
+See [social media examples](examples/social-media/README.md) for details and instructions on rebuilding the video.

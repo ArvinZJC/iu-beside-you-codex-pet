@@ -1,25 +1,387 @@
 #!/usr/bin/env python3
-"""Render the social-media demonstration with a procedurally generated soundtrack."""
+"""Build the IU scrapbook demonstration from the edited recording and pet artwork."""
 
 import argparse
+from contextlib import ExitStack
 import json
-import math
 import os
+from pathlib import Path
 import shutil
 import subprocess
-import sys
 import tempfile
-from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont, ImageSequence
+import numpy as np
+from PIL import Image, ImageDraw, ImageFont
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-ASSETS = SCRIPT_DIR.parent
+ASSETS = Path(__file__).resolve().parents[1]
 ROOT = ASSETS.parents[1]
+WIDTH, HEIGHT, FPS = 1080, 1920, 30
+INTRO_DURATION = 6.4
+MUSIC_START = 8
+SCENES = [
+    ("hello", 6.6, "把日常，变成一点小欢喜"),
+    ("walk", 6.0, "跟着你，走走停停"),
+    ("work", 7.0, "忙碌的时候，也有回应"),
+    ("look", 8.0, "十六个方向，都有回应"),
+    ("guide", 7.0, "把这些小互动，记下来"),
+    ("end", 4.0, "知恩相伴"),
+]
+DURATION = INTRO_DURATION + sum(duration for _, duration, _ in SCENES)
+INK, MUTED, PURPLE = "#493e48", "#766b75", "#9475a3"
+
+
+def run(command):
+    """Run an encoder command and propagate failures."""
+    subprocess.run(command, check=True)
+
+
+class Scrapbook:
+    """Compose paper layouts with the original transparent pet artwork."""
+
+    def __init__(self, font_path, font_index):
+        self.fonts = {
+            size: ImageFont.truetype(font_path, size, index=font_index)
+            for size in (24, 26, 28, 30, 32, 36, 40, 44, 48, 56, 64, 72, 84, 100)
+        }
+        self.animations = json.loads(
+            (ROOT / "examples/animations.json").read_text(encoding="utf-8")
+        )
+        with Image.open(ROOT / "spritesheet.webp") as source:
+            self.atlas = source.convert("RGBA")
+        self.sprites = {}
+        noise = np.random.default_rng(29).integers(-3, 4, (HEIGHT, WIDTH, 1))
+        paper = np.clip(np.array([249, 244, 234]) + noise, 0, 255).astype("uint8")
+        self.paper = Image.fromarray(paper)
+        self.layouts = {}
+
+    def text(self, im, xy, value, size=36, colour=INK, anchor="mm"):
+        ImageDraw.Draw(im).text(
+            xy, value, font=self.fonts[size], fill=colour, anchor=anchor
+        )
+
+    def base(self, label, title, subtitle):
+        im = self.paper.copy()
+        d = ImageDraw.Draw(im)
+        d.line((64, 154, 1016, 154), fill="#d6c9b8", width=2)
+        self.text(im, (68, 110), "IU BESIDE YOU", 28, anchor="lm")
+        self.text(im, (1012, 110), label, 26, MUTED, "rm")
+        self.text(im, (76, 270), title, 64, anchor="lm")
+        self.text(im, (78, 372), subtitle, 30, MUTED, "lm")
+        d.line((76, 1760, 1004, 1760), fill="#d6c9b8", width=2)
+        self.text(im, (76, 1810), "知恩相伴 · 非官方 Codex 桌宠", 26, MUTED, "lm")
+        self.text(im, (1004, 1810), "一点陪伴", 26, PURPLE, "rm")
+        return im
+
+    def card(self, im, box, label, number):
+        x, y, w, h = box
+        d = ImageDraw.Draw(im)
+        d.rectangle((x + 9, y + 12, x + w + 9, y + h + 12), fill="#ddd3c5")
+        d.rectangle((x, y, x + w, y + h), fill="#fffdf9")
+        d.polygon(
+            [(x + 20, y - 12), (x + 150, y - 19), (x + 156, y + 17), (x + 24, y + 24)],
+            fill="#dcd1e3",
+        )
+        self.text(im, (x + 30, y + 57), number, 24, PURPLE, "lm")
+        self.text(im, (x + w / 2, y + h - 44), label, 32)
+
+    def sprite(self, row, col, size):
+        key = row, col, size
+        if key not in self.sprites:
+            self.sprites[key] = self.atlas.crop(
+                (col * 192, row * 208, (col + 1) * 192, (row + 1) * 208)
+            ).resize(size, Image.Resampling.LANCZOS)
+        return self.sprites[key]
+
+    def pose(self, row, time):
+        durations = self.animations[row]["durations_ms"]
+        elapsed = (time * 1000) % sum(durations)
+        for col, duration in enumerate(durations):
+            elapsed -= duration
+            if elapsed < 0:
+                return col
+        return len(durations) - 1
+
+    def pet(self, im, row, col, xy, size):
+        sprite = self.sprite(row, col, size)
+        im.paste(sprite, xy, sprite)
+
+    def layout(self, scene):
+        if scene in self.layouts:
+            return self.layouts[scene].copy()
+        if scene == "hello":
+            im = self.base(
+                "01 / 小欢喜", "把日常，变成小欢喜", "不赶时间，先和她打个招呼。"
+            )
+            self.card(im, (70, 500, 560, 900), "安静陪伴", "01")
+            self.card(im, (670, 520, 330, 440), "向你挥手", "02")
+            self.card(im, (670, 1010, 330, 440), "开心跳跃", "03")
+            self.text(im, (90, 1570), "眨眨眼，挥挥手，再轻轻跳一下。", 36, anchor="lm")
+        elif scene == "walk":
+            im = self.base(
+                "02 / 走走停停", "你去哪，她就去哪", "按住桌宠，向左或向右拖动。"
+            )
+            self.card(im, (80, 540, 920, 450), "向左走走", "04 / LEFT")
+            self.card(im, (80, 1080, 920, 450), "向右走走", "05 / RIGHT")
+            self.text(im, (540, 1650), "把陪伴，挪到喜欢的位置。", 36)
+        elif scene == "work":
+            im = self.base(
+                "03 / 工作小表情",
+                "忙碌的时候，也有回应",
+                "四种状态，四个不同的小表情。",
+            )
+            for number, (label, x, y) in enumerate(
+                [
+                    ("认真思考", 80, 510),
+                    ("等你回应", 565, 510),
+                    ("有点失落", 80, 1080),
+                    ("看看结果", 565, 1080),
+                ],
+                6,
+            ):
+                self.card(im, (x, y, 435, 505), label, f"{number:02d}")
+        elif scene == "look":
+            im = self.base(
+                "04 / 小眼神",
+                "十六个方向，都有回应",
+                "顺时针逐一展示 · 实际视线由应用控制",
+            )
+            self.card(im, (190, 490, 700, 850), "", "16 LOOKS")
+            self.text(im, (540, 1640), "每一个方向，都认真看向你。", 36)
+        elif scene == "guide":
+            im = self.base(
+                "收藏 / 互动便签",
+                "把这些小互动，记下来",
+                "可暂停阅读 · 2026 年 9 月版本行为参考",
+            )
+            d = ImageDraw.Draw(im)
+            d.rectangle((75, 490, 1005, 1640), fill="#fffdf9")
+            rows = [
+                ("悬停", "开心跳跃"),
+                ("向左 / 右拖动", "左右走动"),
+                ("初次唤醒提醒", "向你挥手"),
+                ("任务进行中", "认真思考"),
+                ("需要输入", "等你回应"),
+                ("失败或受阻", "有点失落"),
+                ("任务完成", "看看结果"),
+                ("没有活动提醒", "安静陪伴"),
+            ]
+            for i, (trigger, reaction) in enumerate(rows):
+                y = 565 + i * 108
+                self.text(im, (110, y), trigger, 32, MUTED, "lm")
+                self.text(im, (950, y), reaction, 36, INK, "rm")
+                d.line((110, y + 48, 950, y + 48), fill="#e6ddd1", width=2)
+            self.text(im, (110, 1460), "视线：快捷聊天输入光标，或", 30, anchor="lm")
+            self.text(
+                im,
+                (110, 1510),
+                "Computer Use 操作光标；不是普通鼠标。",
+                30,
+                anchor="lm",
+            )
+            self.text(im, (540, 1690), "实际表现以你安装的应用版本为准", 28, MUTED)
+        else:
+            im = self.base(
+                "留一页 / 给你", "愿忙碌，也有温柔相伴", "IU Beside You · 知恩相伴"
+            )
+            self.text(im, (540, 1190), "九种动画 · 十六个视线方向", 36)
+            self.text(im, (540, 1280), "把陪伴，留在每一个平凡日子里。", 28, PURPLE)
+        self.layouts[scene] = im
+        return im.copy()
+
+    def frame(self, scene, time):
+        im = self.layout(scene)
+        if scene == "hello":
+            for row, xy, size in [
+                (0, (110, 650), (480, 520)),
+                (3, (705, 615), (264, 286)),
+                (4, (705, 1105), (264, 286)),
+            ]:
+                self.pet(im, row, self.pose(row, time), xy, size)
+        elif scene == "walk":
+            distance = int(440 * ((time / 3) % 1))
+            self.pet(im, 2, self.pose(2, time), (620 - distance, 605), (288, 312))
+            self.pet(im, 1, self.pose(1, time), (160 + distance, 1145), (288, 312))
+        elif scene == "work":
+            for row, xy in [
+                (7, (140, 600)),
+                (6, (625, 600)),
+                (5, (140, 1170)),
+                (8, (625, 1170)),
+            ]:
+                self.pet(im, row, self.pose(row, time), xy, (312, 338))
+        elif scene == "look":
+            index = min(int(time * 2), 15)
+            self.pet(im, 9 + index // 8, index % 8, (252, 615), (576, 624))
+            self.text(
+                im, (540, 1295), f"{index+1:02d} / 16    ·    {index*22.5:g}°", 32
+            )
+            d = ImageDraw.Draw(im)
+            for i in range(16):
+                x, y = 220 + (i % 8) * 90, 1440 + (i // 8) * 75
+                d.ellipse(
+                    (x - 20, y - 20, x + 20, y + 20),
+                    fill=PURPLE if i == index else "#ded4e4",
+                )
+                self.text(im, (x, y), str(i + 1), 24, "white" if i == index else MUTED)
+        elif scene == "end":
+            self.pet(im, 3, self.pose(3, time), (300, 570), (480, 520))
+        return im
+
+
+def encode_body(book, ffmpeg, out):
+    command = [
+        ffmpeg,
+        "-y",
+        "-v",
+        "error",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        "-s",
+        f"{WIDTH}x{HEIGHT}",
+        "-r",
+        str(FPS),
+        "-i",
+        "-",
+        "-an",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "medium",
+        "-crf",
+        "18",
+        "-pix_fmt",
+        "yuv420p",
+        "-video_track_timescale",
+        "15360",
+        str(out / "body.mp4"),
+    ]
+    with subprocess.Popen(command, stdin=subprocess.PIPE) as proc:
+        try:
+            for scene, duration, _ in SCENES:
+                for n in range(round(duration * FPS)):
+                    proc.stdin.write(book.frame(scene, n / FPS).tobytes())
+        finally:
+            proc.stdin.close()
+        result = proc.wait()
+        if result:
+            raise subprocess.CalledProcessError(result, command)
+
+
+def render(args, out, ffmpeg):
+    book = Scrapbook(args.font, args.font_index)
+    intro = out / "screen-recording-edited.mp4"
+    source = ASSETS / "screen-recording-edited.mp4"
+    if intro != source:
+        shutil.copyfile(source, intro)
+    run(
+        [
+            ffmpeg,
+            "-y",
+            "-v",
+            "error",
+            "-ss",
+            "1",
+            "-i",
+            str(intro),
+            "-frames:v",
+            "1",
+            str(out / "intro.png"),
+        ]
+    )
+    with Image.open(out / "intro.png") as source:
+        previews = [source.convert("RGB")]
+    previews.extend(book.frame(scene, 1) for scene, _, _ in SCENES)
+    sheet = Image.new("RGB", (270 * 4, 480 * 2), "#e7dfd2")
+    for i, frame in enumerate(previews):
+        sheet.paste(
+            frame.resize((270, 480), Image.Resampling.LANCZOS),
+            ((i % 4) * 270, (i // 4) * 480),
+        )
+    sheet.save(out / "review.jpg", quality=95)
+    chapters = [{"title": "桌面实录", "start": 0, "duration": INTRO_DURATION}]
+    at = INTRO_DURATION
+    for _, duration, title in SCENES:
+        chapters.append({"title": title, "start": round(at, 3), "duration": duration})
+        at += duration
+    (out / "manifest.json").write_text(
+        json.dumps(
+            {
+                "width": WIDTH,
+                "height": HEIGHT,
+                "fps": FPS,
+                "duration": DURATION,
+                "chapters": chapters,
+                "music": {
+                    "title": "Gymnopedie No. 1",
+                    "artist": "Kevin MacLeod",
+                    "licence": "CC BY 4.0",
+                    "start": MUSIC_START,
+                    "duration": DURATION,
+                },
+                "recording": {
+                    "source": "screen-recording-edited.mp4",
+                    "duration": INTRO_DURATION,
+                },
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    if args.preview:
+        target = args.output.with_suffix(".jpg")
+        if target != out / "review.jpg":
+            shutil.copyfile(out / "review.jpg", target)
+        return
+    encode_body(book, ffmpeg, out)
+    (out / "segments.txt").write_text(
+        "file 'screen-recording-edited.mp4'\nfile 'body.mp4'\n", encoding="utf-8"
+    )
+    final = out / "final.mp4"
+    run(
+        [
+            ffmpeg,
+            "-y",
+            "-v",
+            "error",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            str(out / "segments.txt"),
+            "-ss",
+            str(MUSIC_START),
+            "-i",
+            str(ASSETS / "gymnopedie-no-1.mp3"),
+            "-map",
+            "0:v:0",
+            "-map",
+            "1:a:0",
+            "-c:v",
+            "copy",
+            "-af",
+            f"atrim=duration={DURATION},asetpts=PTS-STARTPTS,volume=0.75,afade=t=in:d=0.7,afade=t=out:st={DURATION-2.5}:d=2.5",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "192k",
+            "-t",
+            str(DURATION),
+            "-movflags",
+            "+faststart",
+            str(final),
+        ]
+    )
+    if final != args.output:
+        shutil.copyfile(final, args.output)
+    print(f"Rendered {args.output} ({DURATION:g} seconds)")
 
 
 def main():
-    """Render the demonstration or save a preview contact sheet."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=ASSETS / "demo.mp4")
     parser.add_argument("--preview", action="store_true")
@@ -29,345 +391,37 @@ def main():
     )
     parser.add_argument("--font-index", type=int, default=3)
     args = parser.parse_args()
-    output = args.output.resolve()
-    output.parent.mkdir(parents=True, exist_ok=True)
-    temporary = (
-        tempfile.TemporaryDirectory(prefix="pet-demo-")
-        if args.work_dir is None
-        else None
-    )
-    out = (args.work_dir or Path(temporary.name)).resolve()
-    out.mkdir(parents=True, exist_ok=True)
-    font = args.font
-    if not font:
-        candidates = list(
+    if not args.font:
+        fonts = sorted(
             Path("/System/Library/AssetsV2/com_apple_MobileAsset_Font8").glob(
                 "*/AssetData/PingFang.ttc"
             )
         )
-        if not candidates:
+        if not fonts:
             parser.error(
-                "Supply --font with a Chinese font file (and --font-index for its face)."
+                "Supply --font with a Chinese font file and --font-index for its face."
             )
-        font = str(candidates[0])
+        args.font = str(fonts[0])
     ffmpeg = shutil.which("ffmpeg")
-    if not ffmpeg and not args.preview:
+    if not ffmpeg:
         parser.error("ffmpeg must be installed and available on PATH")
-    width, height = 1080, 1920
-    ink = "#3e304b"
-    muted = "#85718f"
-    purple = "#9674b1"
-    card = "#f7f6fb"
-    fonts = {
-        n: ImageFont.truetype(font, n, index=args.font_index)
-        for n in [24, 28, 30, 32, 36, 42, 48, 64, 76, 86]
-    }
-
-    def text(im, xy, s, n=36, c=ink, anchor="mm"):
-        ImageDraw.Draw(im).text(xy, s, font=fonts[n], fill=c, anchor=anchor)
-
-    def base(chapter):
-        im = Image.new("RGB", (width, height), "#eee8f3")
-        d = ImageDraw.Draw(im)
-        d.ellipse((-250, -210, 480, 520), fill="#e5d9ee")
-        d.ellipse((850, 1400, 1310, 2020), fill="#e3d5eb")
-        text(im, (100, 150), "IU BESIDE YOU", 32, purple, "lm")
-        text(im, (980, 150), chapter, 28, muted, "rm")
-        d.line((100, 207, 980, 207), fill="#d4c4df", width=2)
-        text(im, (540, 1740), "知恩相伴 · 粉丝自制非官方 Codex 桌宠", 28, muted)
-        return im
-
-    serial = 0
-    timeline = []
-    samples = []
-    manifest = []
-
-    def save(im, duration):
-        nonlocal serial
-        p = out / f"frame-{serial:04d}.png"
-        im.save(p)
-        serial += 1
-        return (p, duration)
-
-    def add(seq, loops, title):
-        start = sum(t for p, t in timeline)
-        timeline.extend(seq * loops)
-        manifest.append(
-            {
-                "title": title,
-                "start": round(start, 3),
-                "duration": round(sum(t for p, t in seq) * loops, 3),
-            }
-        )
-        samples.append(seq[0][0])
-
-    def paste_pet(im, pet, x=252, y=640):
-        im.paste(
-            pet.convert("RGB").resize((576, 624), Image.Resampling.LANCZOS), (x, y)
-        )
-
-    def panel(im):
-        ImageDraw.Draw(im).rounded_rectangle((90, 570, 990, 1325), radius=60, fill=card)
-
-    def gif_frames(name):
-        gif = Image.open(ROOT / "examples" / name)
-        return [
-            (f.convert("RGB").copy(), f.info.get("duration", 100) / 1000)
-            for f in ImageSequence.Iterator(gif)
-        ]
-
-    # This scene assembly section was truncated in the archived renderer.
-    # Reconstructed from the reference video, recovered chapter timings and gallery assets.
-    seq = []
-    for pet, dur in gif_frames("waving.gif"):
-        im = base("完整动作图鉴")
-        text(im, (540, 340), "知恩女士，来陪你啦", 86)
-        text(im, (540, 452), "九种动画 · 十六个视线方向", 36, muted)
-        panel(im)
-        paste_pet(im, pet)
-        text(im, (540, 1450), "Uaena，今天也要元气满满呀", 42)
-        text(im, (540, 1535), "IU Beside You  /  Codex pet", 30, muted)
-        seq.append(save(im, dur))
-    add(seq, 4, "开场")
-    scenes = [
-        ("idle.gif", "安静陪伴", "RESTING", "轻轻眨眼，静静呼吸", 3),
-        ("running-right.gif", "向右走走", "MOVING RIGHT", "迈着小步向右走", 3),
-        ("running-left.gif", "向左走走", "MOVING LEFT", "换个方向，继续陪你", 3),
-        ("waving.gif", "向你挥手", "ATTENTION WAVE", "挥挥手，想让你注意到我", 5),
-        ("jumping.gif", "开心跳跃", "JUMPING", "蹲下、跃起，再轻轻落地", 4),
-        ("failed.gif", "有点失落", "DISAPPOINTED", "短暂失落后，慢慢恢复", 3),
-        ("waiting.gif", "等你回应", "WAITING FOR YOU", "等着你的下一步指示", 4),
-        ("running.gif", "认真思考", "THINKING", "任务进行中，专注忙碌", 4),
-        ("review.gif", "看看结果", "REVIEWING", "带着思考，检查刚刚的成果", 4),
-    ]
-    for i, (name, title, en, caption, loops) in enumerate(scenes):
-        seq = []
-        for pet, dur in gif_frames(name):
-            im = base(f"{i+1:02d} / 09")
-            text(im, (540, 350), title, 86)
-            text(im, (540, 454), en, 30, muted)
-            panel(im)
-            paste_pet(im, pet)
-            text(im, (540, 1445), caption, 42)
-            text(im, (540, 1530), "每个小动作，都是一点陪伴", 30, muted)
-            d = ImageDraw.Draw(im)
-            for j in range(9):
-                d.rounded_rectangle(
-                    (350 + j * 47, 1615, 380 + j * 47, 1621),
-                    radius=3,
-                    fill=purple if j == i else "#d4c4df",
-                )
-            seq.append(save(im, dur))
-        add(seq, loops, title)
-    seq = []
-    for pet, dur in gif_frames("look-around.gif"):
-        im = base("视线方向 / 01")
-        text(im, (540, 350), "十六种小眼神", 86)
-        text(im, (540, 455), "十六个方向 · 顺时针完整预览", 36, muted)
-        panel(im)
-        paste_pet(im, pet)
-        text(im, (540, 1445), "十六个视线方向，一次看全", 42)
-        text(im, (540, 1535), "此处为轮播演示；实际触发由应用控制", 30, muted)
-        seq.append(save(im, dur))
-    add(seq, 2, "十六方向顺时针轮播")
-    seq = []
-    for i in range(16):
-        pet = Image.open(ROOT / "examples" / f"look-{i:02d}.png")
-        im = base("视线方向 / 02")
-        text(im, (540, 350), "每个方向，都有回应", 64)
-        text(im, (540, 454), f"{i+1:02d} / 16  ·  {i*22.5:g}°", 36, muted)
-        panel(im)
-        paste_pet(im, pet)
-        d = ImageDraw.Draw(im)
-        for j in range(16):
-            angle = j * math.pi / 8
-            x = 540 + 342 * math.sin(angle)
-            y = 950 - 342 * math.cos(angle)
-            radius = 12 if j == i else 5
-            d.ellipse(
-                (x - radius, y - radius, x + radius, y + radius),
-                fill=purple if j == i else "#d4c4df",
-            )
-        direction = (
-            "正上方"
-            if i == 0
-            else (
-                "右上方"
-                if i < 4
-                else (
-                    "正右方"
-                    if i == 4
-                    else (
-                        "右下方"
-                        if i < 8
-                        else (
-                            "正下方"
-                            if i == 8
-                            else (
-                                "左下方"
-                                if i < 12
-                                else "正左方" if i == 12 else "左上方"
-                            )
-                        )
-                    )
-                )
+    args.output = args.output.resolve()
+    if not args.preview and args.output in {
+        (ASSETS / "screen-recording-edited.mp4").resolve(),
+        (ASSETS / "gymnopedie-no-1.mp3").resolve(),
+    }:
+        parser.error("--output must not overwrite a source recording")
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    with ExitStack() as stack:
+        out = (
+            args.work_dir.resolve()
+            if args.work_dir
+            else Path(
+                stack.enter_context(tempfile.TemporaryDirectory(prefix="iu-demo-"))
             )
         )
-        text(im, (540, 1445), direction, 48)
-        text(im, (540, 1535), "从正上方开始，顺时针逐一展示", 30, muted)
-        seq.append(save(im, 0.6))
-    add(seq, 1, "十六方向逐一展示")
-    # Trigger summary based on the locally inspected app overlay implementation.
-    im = base("互动小贴士")
-    text(im, (540, 340), "小动作触发指南", 76)
-    text(im, (540, 435), "互动小贴士 · 可暂停查看", 36, muted)
-    d = ImageDraw.Draw(im)
-    d.rounded_rectangle((85, 510, 995, 1495), radius=38, fill=card)
-    text(im, (130, 564), "小动作", 32, purple, "lm")
-    text(im, (410, 564), "什么时候会出现", 32, purple, "lm")
-    d.line((125, 610, 955, 610), fill="#dfd3e7", width=2)
-    rows = [
-        ("安静陪伴", "没有活动提醒时"),
-        ("左右走动", "按住桌宠，向左或向右拖动"),
-        ("开心跳跃", "鼠标悬停在桌宠上"),
-        ("向你挥手", "应用触发初次唤醒提醒时"),
-        ("认真思考", "活动提醒显示任务进行中"),
-        ("等你回应", "活动提醒显示需要输入时"),
-        ("有点失落", "活动提醒显示失败或受阻时"),
-        ("看看结果", "活动提醒显示任务完成时"),
-        ("视线方向", "快捷聊天输入光标，或"),
-    ]
-    for i, (name, trigger) in enumerate(rows):
-        y = 660 + i * 86
-        text(im, (130, y), name, 32, ink, "lm")
-        text(im, (410, y), trigger, 30, ink, "lm")
-        if i < 8:
-            d.line((125, y + 43, 955, y + 43), fill="#e9e1ee", width=1)
-    text(im, (410, 1392), "Computer Use 的操作光标", 28, ink, "lm")
-    text(im, (540, 1555), "普通鼠标移动不会让她轮播全部视线", 30, muted)
-    text(im, (540, 1615), "按当前安装版本整理，实际表现以应用为准", 28, muted)
-    add([save(im, 7)], 1, "动画触发指南")
-    seq = []
-    for pet, dur in gif_frames("waving.gif"):
-        im = base("IU BESIDE YOU")
-        text(im, (540, 350), "把陪伴留在桌面", 76)
-        text(im, (540, 454), "九种动画 + 十六个视线方向", 36, muted)
-        panel(im)
-        paste_pet(im, pet)
-        text(im, (540, 1445), "IU Beside You", 48)
-        text(im, (540, 1535), "愿每一次忙碌，都有温柔相伴", 36, muted)
-        seq.append(save(im, dur))
-    add(seq, 4, "结尾")
-    # PNG stills at a 100 Hz input timebase retain source durations; output sampled at 30fps.
-    # FFmpeg resolves these generated filenames relative to the timeline file.
-    # Keeping directory names out of the list also avoids concat path quoting issues.
-    with (out / "timeline.txt").open("w", encoding="utf-8") as f:
-        for p, dur in timeline:
-            f.write(f"file '{p.name}'\noption framerate 100\nduration {dur:.3f}\n")
-        f.write(f"file '{timeline[-1][0].name}'\noption framerate 100\n")
-    (out / "manifest.json").write_text(
-        json.dumps(
-            {
-                "width": width,
-                "height": height,
-                "fps": 30,
-                "duration": 59.4,
-                "source_timeline_duration": round(sum(t for _, t in timeline), 3),
-                "chapters": manifest,
-                "source": "examples/index.html and original example GIF/PNG assets",
-                "audio": "Original instrumental soundtrack generated by compose_demo_music.py",
-                "timing": "Recovered concat renderer, sampled at 30 fps and trimmed to the original 59.4-second export.",
-            },
-            ensure_ascii=False,
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
-    preview = Image.new("RGB", (270 * 4, 480 * 4), "white")
-    for i, p in enumerate(samples):
-        im = Image.open(p)
-        im.thumbnail((270, 480))
-        preview.paste(im, ((i % 4) * 270, (i // 4) * 480))
-    preview.save(out / "review.jpg")
-    # Keep the existing social-media cover.
-    print(json.dumps(manifest, ensure_ascii=False), flush=True)
-    if args.preview:
-        preview_output = output.with_suffix(".jpg")
-        if preview_output != out / "review.jpg":
-            shutil.copyfile(out / "review.jpg", preview_output)
-        return
-    subprocess.run(
-        [
-            ffmpeg,
-            "-y",
-            "-v",
-            "warning",
-            "-f",
-            "concat",
-            "-safe",
-            "0",
-            "-i",
-            str(out / "timeline.txt"),
-            "-t",
-            "59.4",
-            "-r",
-            "30",
-            "-c:v",
-            "libx264",
-            "-preset",
-            "medium",
-            "-crf",
-            "18",
-            "-pix_fmt",
-            "yuv420p",
-            "-movflags",
-            "+faststart",
-            str(out / "IU-Beside-You-完整动画展示.mp4"),
-        ],
-        check=True,
-    )
-
-    # Recover the original procedural score and mux it into the newly rendered video.
-    subprocess.run(
-        [sys.executable, str(SCRIPT_DIR / "compose_demo_music.py"), str(out)],
-        check=True,
-    )
-    subprocess.run(
-        [
-            ffmpeg,
-            "-y",
-            "-v",
-            "error",
-            "-i",
-            str(out / "IU-Beside-You-完整动画展示.mp4"),
-            "-i",
-            str(out / "知恩相伴-original.wav"),
-            "-map",
-            "0:v:0",
-            "-map",
-            "1:a:0",
-            "-c:v",
-            "copy",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "192k",
-            "-t",
-            "59.4",
-            "-movflags",
-            "+faststart",
-            str(output),
-        ],
-        check=True,
-    )
-    metadata = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
-    metadata["audio_provenance"] = json.loads(
-        (out / "music-provenance.json").read_text(encoding="utf-8")
-    )
-    (out / "manifest.json").write_text(
-        json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
-    print(f"Rendered {output}")
+        out.mkdir(parents=True, exist_ok=True)
+        render(args, out, ffmpeg)
 
 
 if __name__ == "__main__":
